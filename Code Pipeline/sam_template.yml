@@ -4,16 +4,16 @@ Resources:
   LF1Function:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: LF1Function.lambda_handler
+      Handler: index-photos.lambda_handler
       Runtime: python3.9
       CodeUri: ./Lambdas/
-      Role: "arn:aws:iam::290851490523:role/service-role/search-photos-role-ghk40dy2"
+      Role: "arn:aws:iam::290851490523:role/service-role/index-photos-role-uhv2ehqp"
       Timeout: 30
       MemorySize: 128
   LF2Function:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: LF2Function.lambda_handler
+      Handler: search-photos.lambda_handler
       Runtime: python3.9
       CodeUri: ./Lambdas/
       Role: "arn:aws:iam::290851490523:role/service-role/search-photos-role-ghk40dy2"

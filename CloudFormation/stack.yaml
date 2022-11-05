@@ -48,12 +48,6 @@ Parameters:
         MinLength: 40
         MaxLength: 40
         AllowedPattern: '[a-z0-9]*'
-    
-    OpenSearchpassword:
-        Type: "String"
-
-    OpenSearchmaster:
-        Type: "String"
         
 Resources:
     LambdaFunction:
@@ -139,54 +133,6 @@ Resources:
             EndpointConfiguration: 
                 Types: 
                   - "REGIONAL"
-    OpenSearchServiceDomain:
-    Type: "AWS::OpenSearchService::Domain"
-    Properties:
-        DomainName: "photos"
-        EngineVersion: "7.10"
-        ClusterConfig: 
-            ColdStorageOptions: 
-                Enabled: false
-            DedicatedMasterEnabled: false
-            InstanceCount: 1
-            InstanceType: "t3.small.elasticsearch"
-            ZoneAwarenessEnabled: false
-            WarmEnabled: false
-        AccessPolicies: !Sub "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"*\"},\"Action\":\"es:*\",\"Resource\":\"arn:aws:es:${AWS::Region}:290851490523:domain/photos/*\"}]}"
-        SnapshotOptions: {}
-        snapshot_options: {}
-        EncryptionAtRestOptions: 
-            Enabled: true
-            KmsKeyId: !Sub "arn:aws:kms:${AWS::Region}:290851490523:key/76dc29b0-8f2f-4b16-a8b1-781e92534b8a"
-        NodeToNodeEncryptionOptions: 
-            Enabled: true
-        AdvancedOptions: 
-            Enabled: true
-            InternalUserDatabaseEnabled: true
-            MasterUserOptions:
-                # MasterUserARN: arn:aws:iam::996208533033:role/LambdaMasterUserRole
-                MasterUserName: !Ref OpenSearchmaster
-                MasterUserPassword: !Ref OpenSearchpassword
-            "indices.fielddata.cache.size": "20"
-            "indices.query.bool.max_clause_count": "1024"
-            override_main_response_version: "false"
-            "rest.action.multi.allow_explicit_index": "true"
-        EBSOptions: 
-            EBSEnabled: true
-            VolumeType: "gp3"
-            VolumeSize: 10
-            Iops: 3000
-            Throughput: 125
-        CognitoOptions: 
-            Enabled: false
-        DomainEndpointOptions: 
-            EnforceHTTPS: true
-            TLSSecurityPolicy: "Policy-Min-TLS-1-0-2019-07"
-            CustomEndpointEnabled: false
-        AdvancedSecurityOptions: 
-            Enabled: true
-            InternalUserDatabaseEnabled: true
-            AnonymousAuthEnabled: false
 
     CodeBuildProject:
         Type: "AWS::CodeBuild::Project"
