@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion : '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  LF1Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: LF1Function.lambda_handler
+      Runtime: python3.9
+      CodeUri: ./Lambdas/
+      Role: "arn:aws:iam::290851490523:role/service-role/search-photos-role-ghk40dy2"
+      Timeout: 30
+      MemorySize: 128
+  LF2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: LF2Function.lambda_handler
+      Runtime: python3.9
+      CodeUri: ./Lambdas/
+      Role: "arn:aws:iam::290851490523:role/service-role/search-photos-role-ghk40dy2"
+      Timeout: 30
+      MemorySize: 128
