@@ -1,22 +1,21 @@
-
 AWSTemplateFormatVersion: "2010-09-09"
 Description: "NLP based PhotoAlbum Web Application"
 Parameters:
     S3Bucket4Name:
         Type: "String"
-        Default: "s3-voice-recording-photo-album"
+        Default: "s3-voice-recording-photo-album-3123"
 
     S3Bucket3Name:
         Type: "String"
-        Default: "s3-voice-output-photo-album"
+        Default: "s3-voice-output-photo-album-3123"
 
     S3Bucket2Name:
         Type: "String"
-        Default: "photoalbumcloudassignment3"
+        Default: "photoalbumcloudassignment3-3123"
 
     S3BucketName:
         Type: "String"
-        Default: "nlp-photo-album-frontend"
+        Default: "nlp-photo-album-frontend-3123"
 
     LambdaFunction2Name:
         Type: "String"
@@ -25,52 +24,27 @@ Parameters:
     LambdaFunctionName:
         Type: "String"
         Default: "search-photos"
-
-    GitHubOwner:
-        Type: String
-        Default: phananh1096
-        AllowedPattern: '[A-Za-z0-9-]+'
-
-    GitHubRepo:
-        Type: String
-        Default: A2-Frontend
-        AllowedPattern: '[A-Za-z0-9-]+'
-
-    GitHubBranch:
-        Type: String
-        Default: main
-        AllowedPattern: '[A-Za-z0-9-]+'
-
-    GitHubOAuthToken:
-        Type: String
-        Default: '2b811ae58dcf52fa7cd184ba29913137916248ba'
-        NoEcho: true
-        MinLength: 40
-        MaxLength: 40
-        AllowedPattern: '[a-z0-9]*'
-        
+AWSTemplateFormatVersion: 2010-09-09
 Resources:
-    LambdaFunction:
-        Type: "AWS::Lambda::Function"
+    CodeCommitRepository:
+        Type: "AWS::CodeCommit::Repository"
         Properties:
-            Description: ""
-            FunctionName: !Ref LambdaFunctionName
-            Handler: "lambda_function.lambda_handler"
-            Architectures: 
-              - "x86_64"
-            Code: 
-                S3Bucket: "eashan-kaushik-public"
-                S3Key: "index-photos.zip"
-            MemorySize: 128
-            Role: !GetAtt IAMRole2.Arn
-            Runtime: "python3.9"
-            Timeout: 30
-            TracingConfig: 
-                Mode: "PassThrough"
-            Layers: 
-              - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python39:1"
-            EphemeralStorage: 
-                Size: 512
+            RepositoryName: "FrontendPhotoAlbum"
+            Code:
+                BranchName: main
+                S3: 
+                    Bucket: eashan-demo
+                    Key: s3-front-end-code.zip
+
+    CodeCommitRepository2:
+        Type: "AWS::CodeCommit::Repository"
+        Properties:
+            RepositoryName: "LambdaPhotoAlbum"            
+            Code:
+                BranchName: main
+                S3: 
+                    Bucket: eashan-demo
+                    Key: lambda-code.zip
 
     LambdaFunction2:
         Type: "AWS::Lambda::Function"
@@ -81,10 +55,10 @@ Resources:
             Architectures: 
               - "x86_64"
             Code: 
-                S3Bucket: "eashan-kaushik-public"
+                S3Bucket: "eashan-demo"
                 S3Key: "search-photos.zip"
             MemorySize: 128
-            Role: !GetAtt IAMRole.Arn
+            Role: !GetAtt IAMRole2.Arn
             Runtime: "python3.9"
             Timeout: 8
             TracingConfig: 
@@ -98,18 +72,27 @@ Resources:
         Type: "AWS::S3::Bucket"
         Properties:
             BucketName: !Ref S3BucketName
+            AccessControl: PublicRead
             WebsiteConfiguration: 
                 IndexDocument: "index.html"
 
-    S3Bucket2:
-        Type: "AWS::S3::Bucket"
+    BucketPolicy:
+        Type: 'AWS::S3::BucketPolicy'
         Properties:
-            BucketName: !Ref S3Bucket2Name
-            NotificationConfiguration: 
-                LambdaConfigurations: 
-                  - 
-                    Event: "s3:ObjectCreated:Put"
-                    Function: !GetAtt LambdaFunction2.Arn
+            PolicyDocument:
+                Id: MyPolicy
+                Version: 2012-10-17
+                Statement:
+                  - Sid: PublicReadForGetBucketObjects
+                    Effect: Allow
+                    Principal: '*'
+                    Action: 's3:GetObject'
+                    Resource: !Join 
+                        - ''
+                        - - 'arn:aws:s3:::'
+                          - !Ref S3Bucket
+                          - /*
+            Bucket: !Ref S3Bucket
 
     S3Bucket3:
         Type: "AWS::S3::Bucket"
@@ -120,191 +103,54 @@ Resources:
         Type: "AWS::S3::Bucket"
         Properties:
             BucketName: !Ref S3Bucket4Name
-
-    ApiGatewayRestApi:
-        Type: "AWS::ApiGateway::RestApi"
+    
+    S3BucketForPhotosB2:
+        Type: 'AWS::S3::Bucket'
+        DependsOn: PermissionForS3ToLF1
         Properties:
-            Name: "AI Photo Search"
-            Description: "AI Photo Search application, built during the Cloud and Big Data course at Columbia University."
-            ApiKeySourceType: "HEADER"
-            BinaryMediaTypes: 
-              - "image/*"
-              - "audio/*"
-            EndpointConfiguration: 
-                Types: 
-                  - "REGIONAL"
+            BucketName: !Ref S3Bucket2Name
+            NotificationConfiguration:
+                LambdaConfigurations:
+                  - Event: s3:ObjectCreated:*
+                    Function: !GetAtt LambdaFunction.Arn
 
-    CodeBuildProject:
-        Type: "AWS::CodeBuild::Project"
+    S3BucketB2Policy:
+        Type: AWS::S3::BucketPolicy
         Properties:
-            Name: "LambdaPhotoAlbumCodeBuild"
-            Source: 
-                InsecureSsl: false
-                Type: "CODEPIPELINE"
-            Artifacts: 
-                EncryptionDisabled: false
-                Name: "LambdaPhotoAlbumCodeBuild"
-                Packaging: "NONE"
-                Type: "CODEPIPELINE"
-            Cache: 
-                Type: "NO_CACHE"
-            Environment: 
-                ComputeType: "BUILD_GENERAL1_SMALL"
-                Image: "aws/codebuild/standard:6.0"
-                ImagePullCredentialsType: "CODEBUILD"
-                PrivilegedMode: false
-                Type: "LINUX_CONTAINER"
-            ServiceRole: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/codebuild-LambdaPhotoAlbumCodeBuild-service-role"
-            TimeoutInMinutes: 60
-            QueuedTimeoutInMinutes: 480
-            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
-            BadgeEnabled: false
-            LogsConfig: 
-                CloudWatchLogs: 
-                    Status: "ENABLED"
-                S3Logs: 
-                    Status: "DISABLED"
-                    EncryptionDisabled: false
-            Visibility: "PRIVATE"
-
-    CodePipelinePipeline:
-        Type: "AWS::CodePipeline::Pipeline"
-        Properties:
-            Name: "FrontendPhotoAlbumPipeline"
-            RoleArn: !GetAtt IAMRole4.Arn
-            ArtifactStore: 
-                Location: !Sub "codepipeline-${AWS::Region}-511494083853"
-                Type: "S3"
-            Stages: 
-              - Name: "Source"
-                Actions: 
-                  - Name: "Source"
-                    ActionTypeId: 
-                        Category: "Source"
-                        Owner: "AWS"
-                        Provider: "CodeCommit"
-                        Version: "1"
-                    Configuration: 
+            Bucket: !Ref S3BucketForPhotosB2
+            PolicyDocument:
+                {
+                'Statement':
+                    [
+                    {
+                        'Effect': 'Allow',
+                        'Principal': { 'AWS': '*' },
+                        'Action': 's3:ListBucket',
+                        'Resource':
                         {
-                        'Owner': !Ref GitHubOwner,
-                        'Repo': !Ref GitHubRepo,
-                        'Branch': !Ref GitHubBranch,
-                        'OAuthToken': !Ref GitHubOAuthToken,
-                        }
-                    OutputArtifacts: 
-                      - Name: "SourceArtifact"
-                    Region: !Ref AWS::Region
-                    Namespace: "SourceVariables"
-                    RunOrder: 1
-              - Name: "Deploy"
-                Actions: 
-                  - Name: "Deploy"
-                    ActionTypeId: 
-                        Category: "Deploy"
-                        Owner: "AWS"
-                        Provider: "S3"
-                        Version: "1"
-                    Configuration: 
-                        BucketName: !Ref S3Bucket
-                        Extract: "true"
-                    InputArtifacts: 
-                      - Name: "SourceArtifact"
-                    Region: !Ref AWS::Region
-                    Namespace: "DeployVariables"
-                    RunOrder: 1
-
-    CodePipelinePipeline2:
-        Type: "AWS::CodePipeline::Pipeline"
-        Properties:
-            Name: "LambdaPhotoAlbumPipeline"
-            RoleArn: !GetAtt IAMRole5.Arn
-            ArtifactStore: 
-                Location: !Sub "codepipeline-${AWS::Region}-511494083853"
-                Type: "S3"
-            Stages: 
-              - Name: "Source"
-                Actions: 
-                  - Name: "Source"
-                    ActionTypeId: 
-                        Category: "Source"
-                        Owner: "AWS"
-                        Provider: "CodeCommit"
-                        Version: "1"
-                    Configuration: 
+                            'Fn::Join':
+                            ['', ['arn:aws:s3:::', { 'Ref': 'S3BucketForPhotosB2' }]],
+                        },
+                    },
+                    {
+                        'Effect': 'Allow',
+                        'Principal': { 'AWS': '*' },
+                        'Action': ['s3:GetObject', 's3:PutObject'],
+                        'Resource':
                         {
-                        'Owner': !Ref GitHubOwner,
-                        'Repo': !Ref GitHubRepo,
-                        'Branch': !Ref GitHubBranch,
-                        'OAuthToken': !Ref GitHubOAuthToken,
-                        }
-                    OutputArtifacts: 
-                      - Name: "SourceArtifact"
-                    Region: !Ref AWS::Region
-                    Namespace: "SourceVariables"
-                    RunOrder: 1
-              - Name: "Build"
-                Actions: 
-                  - Name: "Build"
-                    ActionTypeId: 
-                        Category: "Build"
-                        Owner: "AWS"
-                        Provider: "CodeBuild"
-                        Version: "1"
-                    Configuration: 
-                        ProjectName: !Ref CodeBuildProject
-                    InputArtifacts: 
-                      - Name: "SourceArtifact"
-                    OutputArtifacts: 
-                      - Name: "BuildArtifact"
-                    Region: !Ref AWS::Region
-                    Namespace: "BuildVariables"
-                    RunOrder: 1
-              - Name: "Deploy"
-                Actions: 
-                  - Name: "Deploy"
-                    ActionTypeId: 
-                        Category: "Deploy"
-                        Owner: "AWS"
-                        Provider: "CloudFormation"
-                        Version: "1"
-                    Configuration: 
-                        ActionMode: "CHANGE_SET_REPLACE"
-                        Capabilities: "CAPABILITY_IAM"
-                        ChangeSetName: "LambdaCICD"
-                        RoleArn: !GetAtt IAMRole7.Arn
-                        StackName: "LambdaCICD"
-                        TemplatePath: "BuildArtifact::outSamTemplate.yaml"
-                    InputArtifacts: 
-                      - Name: "BuildArtifact"
-                    Region: !Ref AWS::Region
-                    Namespace: "DeployVariables"
-                    RunOrder: 1
-              - Name: "ApproveChangeSet"
-                Actions: 
-                  - Name: "ManualApprovel"
-                    ActionTypeId: 
-                        Category: "Approval"
-                        Owner: "AWS"
-                        Provider: "Manual"
-                        Version: "1"
-                    Configuration: {}
-                    Region: !Ref AWS::Region
-                    RunOrder: 1
-              - Name: "ExecuteChangeSet"
-                Actions: 
-                  - Name: "Execute"
-                    ActionTypeId: 
-                        Category: "Deploy"
-                        Owner: "AWS"
-                        Provider: "CloudFormation"
-                        Version: "1"
-                    Configuration: 
-                        ActionMode: "CHANGE_SET_EXECUTE"
-                        ChangeSetName: "LambdaCICD"
-                        StackName: "LambdaCICD"
-                    Region: !Ref AWS::Region
-                    RunOrder: 1
-
+                            'Fn::Join':
+                            [
+                                '',
+                                [
+                                'arn:aws:s3:::',
+                                { 'Ref': 'S3BucketForPhotosB2' },
+                                '/*',
+                                ],
+                            ],
+                        },
+                    },
+                    ],
+                }
 
     IAMRole:
         Type: "AWS::IAM::Role"
@@ -333,6 +179,288 @@ Resources:
               - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
               - "arn:aws:iam::aws:policy/AmazonOpenSearchServiceFullAccess"
 
+    LambdaFunction:
+        DependsOn:
+            - IAMRole
+        Type: "AWS::Lambda::Function"
+        DependsOn: IAMRole
+        Properties:
+            Description: ""
+            FunctionName: !Ref LambdaFunctionName
+            Handler: "lambda_function.lambda_handler"
+            Architectures: 
+              - "x86_64"
+            Code: 
+                S3Bucket: "eashan-demo"
+                S3Key: "index-photos.zip"
+            MemorySize: 128
+            Role: !GetAtt IAMRole.Arn
+            Runtime: "python3.9"
+            Timeout: 30
+            TracingConfig: 
+                Mode: "PassThrough"
+            Layers: 
+              - !Sub "arn:aws:lambda:${AWS::Region}:336392948345:layer:AWSSDKPandas-Python39:1"
+            EphemeralStorage: 
+                Size: 512
+
+    PermissionForS3ToLF1:
+        Type: 'AWS::Lambda::Permission'
+        Properties:
+            Action: lambda:InvokeFunction
+            FunctionName: !Ref LambdaFunction
+            Principal: s3.amazonaws.com
+            SourceAccount: !Ref 'AWS::AccountId'
+            SourceArn: !Sub 'arn:aws:s3:::${S3Bucket2Name}'
+    
+    ApiGatewayRestApi:
+        Type: "AWS::ApiGateway::RestApi"
+        Properties:
+            Name: "AI Photo Search"
+            Description: "AI Photo Search application, built during the Cloud and Big Data course at Columbia University."
+            ApiKeySourceType: "HEADER"
+            BinaryMediaTypes: 
+              - "image/*"
+              - "audio/*"
+            EndpointConfiguration: 
+                Types: 
+                  - "REGIONAL"
+            BodyS3Location:
+                Bucket: 'eashan-demo'
+                Key: 'AI Photo Search-v1-swagger.yaml'
+
+    CodeBuildProject:
+        Type: "AWS::CodeBuild::Project"
+        Properties:
+            Name: !Sub "${CodeCommitRepository2.Name}CodeBuild"
+            Source: 
+                InsecureSsl: false
+                Type: "CODEPIPELINE"
+            Artifacts: 
+                EncryptionDisabled: false
+                Name: !Sub "${CodeCommitRepository2.Name}CodeBuild"
+                Packaging: "NONE"
+                Type: "CODEPIPELINE"
+            Cache: 
+                Type: "NO_CACHE"
+            Environment: 
+                ComputeType: "BUILD_GENERAL1_SMALL"
+                Image: "aws/codebuild/standard:6.0"
+                ImagePullCredentialsType: "CODEBUILD"
+                PrivilegedMode: false
+                Type: "LINUX_CONTAINER"
+            ServiceRole: !Ref IAMRole6
+            TimeoutInMinutes: 60
+            QueuedTimeoutInMinutes: 480
+            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
+            BadgeEnabled: false
+            LogsConfig: 
+                CloudWatchLogs: 
+                    Status: "ENABLED"
+                S3Logs: 
+                    Status: "DISABLED"
+                    EncryptionDisabled: false
+            Visibility: "PRIVATE"
+    CodeBuildProject:
+        Type: "AWS::CodeBuild::Project"
+        Properties:
+            Name: "LambdaPhotoAlbumCodeBuild"
+            Source: 
+                InsecureSsl: false
+                Type: "CODEPIPELINE"
+            Artifacts: 
+                EncryptionDisabled: false
+                Name: "LambdaPhotoAlbumCodeBuild"
+                Packaging: "NONE"
+                Type: "CODEPIPELINE"
+            Cache: 
+                Type: "NO_CACHE"
+            Environment: 
+                ComputeType: "BUILD_GENERAL1_SMALL"
+                Image: "aws/codebuild/standard:6.0"
+                ImagePullCredentialsType: "CODEBUILD"
+                PrivilegedMode: false
+                Type: "LINUX_CONTAINER"
+            ServiceRole: !GetAtt IAMRole6.Arn
+            TimeoutInMinutes: 60
+            QueuedTimeoutInMinutes: 480
+            EncryptionKey: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:alias/aws/s3"
+            BadgeEnabled: false
+            LogsConfig: 
+                CloudWatchLogs: 
+                    Status: "ENABLED"
+                S3Logs: 
+                    Status: "DISABLED"
+                    EncryptionDisabled: false
+            Visibility: "PRIVATE"
+
+    IAMRole6:
+        Type: "AWS::IAM::Role"
+        Properties:
+            Path: "/service-role/"
+            RoleName: "codebuild-LambdaPhotoAlbumCodeBuild-service-role"
+            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codebuild.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
+            MaxSessionDuration: 3600
+            ManagedPolicyArns: 
+              - !Ref IAMManagedPolicy
+              - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+
+    IAMManagedPolicy:
+        Type: "AWS::IAM::ManagedPolicy"
+        Properties:
+            ManagedPolicyName: !Sub "CodeBuildBasePolicy-LambdaPhotoAlbumCodeBuild-${AWS::Region}"
+            Path: "/service-role/"
+            PolicyDocument: !Sub |
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Resource": [
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/LambdaPhotoAlbumCodeBuild",
+                                "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/LambdaPhotoAlbumCodeBuild:*"
+                            ],
+                            "Action": [
+                                "logs:CreateLogGroup",
+                                "logs:CreateLogStream",
+                                "logs:PutLogEvents"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Resource": [
+                                "arn:aws:s3:::codepipeline-${AWS::Region}-*"
+                            ],
+                            "Action": [
+                                "s3:PutObject",
+                                "s3:GetObject",
+                                "s3:GetObjectVersion",
+                                "s3:GetBucketAcl",
+                                "s3:GetBucketLocation"
+                            ]
+                        },
+                        {
+                            "Effect": "Allow",
+                            "Action": [
+                                "codebuild:CreateReportGroup",
+                                "codebuild:CreateReport",
+                                "codebuild:UpdateReport",
+                                "codebuild:BatchPutTestCases",
+                                "codebuild:BatchPutCodeCoverages"
+                            ],
+                            "Resource": [
+                                "arn:aws:codebuild:${AWS::Region}:${AWS::AccountId}:report-group/LambdaPhotoAlbumCodeBuild-*"
+                            ]
+                        }
+                    ]
+                }
+
+
+
+    CodePipelinePipeline2:
+        Type: "AWS::CodePipeline::Pipeline"
+        Properties:
+            Name: !Sub "${CodeCommitRepository2.Name}Pipeline"
+            RoleArn: !GetAtt IAMRole5.Arn
+            ArtifactStore: 
+                Location: !Sub "codepipeline-${AWS::Region}-511494083853"
+                Type: "S3"
+            Stages: 
+              - 
+                Name: "Source"
+                Actions: 
+                  - 
+                    Name: "Source"
+                    ActionTypeId: 
+                        Category: "Source"
+                        Owner: "AWS"
+                        Provider: "CodeCommit"
+                        Version: "1"
+                    Configuration: 
+                        BranchName: "master"
+                        OutputArtifactFormat: "CODE_ZIP"
+                        PollForSourceChanges: "false"
+                        RepositoryName: !GetAtt CodeCommitRepository2.Name
+                    OutputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "SourceVariables"
+                    RunOrder: 1
+              - 
+                Name: "Build"
+                Actions: 
+                  - 
+                    Name: "Build"
+                    ActionTypeId: 
+                        Category: "Build"
+                        Owner: "AWS"
+                        Provider: "CodeBuild"
+                        Version: "1"
+                    Configuration: 
+                        ProjectName: !Sub "${CodeCommitRepository2.Name}CodeBuild"
+                    InputArtifacts: 
+                      - 
+                        Name: "SourceArtifact"
+                    OutputArtifacts: 
+                      - 
+                        Name: "BuildArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "BuildVariables"
+                    RunOrder: 1
+              - 
+                Name: "Deploy"
+                Actions: 
+                  - 
+                    Name: "Deploy"
+                    ActionTypeId: 
+                        Category: "Deploy"
+                        Owner: "AWS"
+                        Provider: "CloudFormation"
+                        Version: "1"
+                    Configuration: 
+                        ActionMode: "CHANGE_SET_REPLACE"
+                        Capabilities: "CAPABILITY_IAM"
+                        ChangeSetName: "LambdaCICD"
+                        RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/CloudFormationServiceRole"
+                        StackName: "LambdaCICD"
+                        TemplatePath: "BuildArtifact::outSamTemplate.yaml"
+                    InputArtifacts: 
+                      - 
+                        Name: "BuildArtifact"
+                    Region: !Ref AWS::Region
+                    Namespace: "DeployVariables"
+                    RunOrder: 1
+              - 
+                Name: "ApproveChangeSet"
+                Actions: 
+                  - 
+                    Name: "ManualApprovel"
+                    ActionTypeId: 
+                        Category: "Approval"
+                        Owner: "AWS"
+                        Provider: "Manual"
+                        Version: "1"
+                    Configuration: {}
+                    Region: !Ref AWS::Region
+                    RunOrder: 1
+              - 
+                Name: "ExecuteChangeSet"
+                Actions: 
+                  - 
+                    Name: "Execute"
+                    ActionTypeId: 
+                        Category: "Deploy"
+                        Owner: "AWS"
+                        Provider: "CloudFormation"
+                        Version: "1"
+                    Configuration: 
+                        ActionMode: "CHANGE_SET_EXECUTE"
+                        ChangeSetName: "LambdaCICD"
+                        StackName: "LambdaCICD"
+                    Region: !Ref AWS::Region
+                    RunOrder: 1
+
     IAMRole3:
         Type: "AWS::IAM::Role"
         Properties:
@@ -349,7 +477,7 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/service-role/"
-            RoleName: !Sub "AWSCodePipelineServiceRole-${AWS::Region}-FrontendPhotoAlbumPipeline"
+            RoleName: !Sub "AWSCodePipeline1ServiceRole-${AWS::Region}-FrontendPhotoAlbumPipeline"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codepipeline.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns: 
@@ -359,22 +487,11 @@ Resources:
         Type: "AWS::IAM::Role"
         Properties:
             Path: "/service-role/"
-            RoleName: !Sub "AWSCodePipelineServiceRole-${AWS::Region}-LambdaPhotoAlbumPipeline"
+            RoleName: !Sub "AWSCodePipeline2ServiceRole-${AWS::Region}-LambdaPhotoAlbumPipeline"
             AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codepipeline.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
             MaxSessionDuration: 3600
             ManagedPolicyArns: 
               - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/AWSCodePipelineServiceRole-${AWS::Region}-LambdaPhotoAlbumPipeline"
-
-    IAMRole6:
-        Type: "AWS::IAM::Role"
-        Properties:
-            Path: "/service-role/"
-            RoleName: !Sub "codebuild-${CodeBuildProject}-service-role"
-            AssumeRolePolicyDocument: "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Service\":\"codebuild.amazonaws.com\"},\"Action\":\"sts:AssumeRole\"}]}"
-            MaxSessionDuration: 3600
-            ManagedPolicyArns: 
-              - !Sub "arn:aws:iam::${AWS::AccountId}:policy/service-role/CodeBuildBasePolicy-${CodeBuildProject}-${AWS::Region}"
-              - "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 
     IAMRole7:
         Type: "AWS::IAM::Role"
@@ -390,5 +507,5 @@ Resources:
               - "arn:aws:iam::aws:policy/AWSCloudFormationFullAccess"
               - "arn:aws:iam::aws:policy/AWSLambda_FullAccess"
             Description: "Allows CloudFormation to create and manage AWS stacks and resources on your behalf."
-
+    
     

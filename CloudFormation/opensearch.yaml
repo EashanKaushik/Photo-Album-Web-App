@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+    Generator: "former2"
+Description: ""
+Parameters:
+    OpenSearchMaster:
+        Type: "String"
+
+    OpenSearchPassword:
+        Type: "String"
+        NoEcho: true
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  ElasticSearchPhotos:
+    Type: AWS::Elasticsearch::Domain
+    Properties:
+      AccessPolicies:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: es:ESHttp*
+            Resource: 'arn:aws:es:us-east-1:684754582172:domain/photos/*'
+
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: true
+        MasterUserOptions:
+          MasterUserName: !Ref OpenSearchMaster
+          MasterUserPassword: !Ref OpenSearchPassword
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+      DomainName: photos
+      EBSOptions:
+        EBSEnabled: true
+        VolumeSize: 10
+        VolumeType: gp2
+      ElasticsearchClusterConfig:
+        InstanceCount: 5
+        InstanceType: t3.small.elasticsearch
+      ElasticsearchVersion: 7.9
+      EncryptionAtRestOptions:
+        Enabled: true
+      NodeToNodeEncryptionOptions:
+        Enabled: true
